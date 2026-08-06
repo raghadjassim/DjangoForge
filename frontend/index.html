@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>DjangoForge</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+:root{--bg:#0a0c10;--s:#111318;--s2:#1a1d24;--b:#252932;--a:#6366f1;--g:#22c55e;--r:#ef4444;--am:#f59e0b;--t:#e2e8f0;--m:#64748b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t);font-family:ui-sans-serif,system-ui,sans-serif;height:100vh;overflow:hidden}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--b);border-radius:3px}
+pre code.hljs{background:transparent!important;font-size:11.5px;line-height:1.6}
+.spin{border:2.5px solid rgba(99,102,241,.3);border-top-color:#6366f1;border-radius:50%;width:16px;height:16px;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fade{animation:fade .3s ease}@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.tree-row:hover{background:rgba(99,102,241,.08)}.tree-row.on{background:rgba(99,102,241,.18);border-left:2px solid var(--a)}
+.tab{border-bottom:2px solid transparent;transition:all .15s}.tab.on{border-bottom-color:var(--a);color:var(--a)}
+.rh{width:4px;background:var(--b);cursor:col-resize;flex-shrink:0}.rh:hover{background:var(--a)}
+.bar-fill{transition:width .5s ease}
+.file-pulse{animation:pulse 1s ease infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+</style>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo}=React;
+
+/* ── Config ── */
+const API = window.location.hostname === "localhost" ? "http://localhost:8000" : "https://YOUR-RAILWAY-URL.railway.app";
+
+/* ── Helpers ── */
+const ext2lang=p=>p.endsWith(".py")?"python":p.endsWith(".html")?"html":p.endsWith(".md")?"markdown":"text";
+const fileIcon=p=>{
+  if(p.includes("settings"))return"⚙️";if(p.includes("models"))return"🗄️";
+  if(p.includes("views"))return"👁️";if(p.includes("urls"))return"🔗";
+  if(p.includes("migration"))return"🔄";if(p.endsWith(".html"))return"📄";
+  if(p.endsWith(".py"))return"🐍";return"📄";
+};
+const scoreColor=s=>s>=90?"#22c55e":s>=70?"#f59e0b":"#ef4444";
+const gradeColor=g=>({A:"#22c55e",B:"#3b82f6",C:"#f59e0b",D:"#f97316",F:"#ef4444"}[g]||"#64748b");
+
+function buildTree(files){
+  const root={};
+  for(const p of Object.keys(files)){
+    const parts=p.split("/");let node=root;
+    for(let i=0;i<parts.length;i++){
+      const k=parts[i];
+      if(i===parts.length-1)node[k]={__f:true,__p:p};
+      else node[k]=node[k]||{};
+    }
+  }
+  return root;
+}
+
+/* ── Code viewer ── */
+const CodeView=({path,content})=>{
+  const ref=useRef(null);
+  useEffect(()=>{
+    if(ref.current){ref.current.removeAttribute("data-highlighted");hljs.highlightElement(ref.current)}
+  },[content,path]);
+  return(
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex justify-between px-4 py-2 text-xs flex-shrink-0" style={{background:"#0d1117",borderBottom:"1px solid var(--b)"}}>
+        <span style={{color:"var(--a)"}}>{fileIcon(path)} {path}</span>
+        <span style={{color:"var(--m)"}}>{(content||"").split("\n").length} lines</span>
+      </div>
+      <div className="flex-1 overflow-auto p-4" style={{background:"#0d1117"}}>
+        <pre><code ref={ref} className={"language-"+ext2lang(path)}>{content||"# empty"}</code></pre>
+      </div>
+    </div>
+  );
+};
+
+/* ── Tree node ── */
+const TNode=({name,node,depth,onSel,sel})=>{
+  const [open,setOpen]=useState(depth<2);
+  if(node.__f){
+    const active=sel===node.__p;
+    return(
+      <div onClick={()=>onSel(node.__p)} className={`tree-row flex items-center gap-1.5 py-1 cursor-pointer text-xs rounded px-1 ${active?"on":""}`} style={{paddingLeft:(depth+1)*12}}>
+        <span>{fileIcon(name)}</span>
+        <span style={{color:active?"var(--a)":"var(--t)"}}>{name}</span>
+      </div>
+    );
+  }
+  const children=Object.entries(node).filter(([k])=>!k.startsWith("__"));
+  return(
+    <div>
+      <div onClick={()=>setOpen(o=>!o)} className="flex items-center gap-1.5 py-1 cursor-pointer text-xs" style={{paddingLeft:depth*12,color:"var(--m)"}}>
+        <span style={{fontSize:9}}>{open?"▼":"▶"}</span><span>📂</span><span className="font-medium">{name}/</span>
+      </div>
+      {open&&children.map(([n,nd])=><TNode key={n} name={n} node={nd} depth={depth+1} onSel={onSel} sel={sel}/>)}
+    </div>
+  );
+};
+
+/* ── Progress bar ── */
+const ProgressBar=({percent,message,filesDone,totalFiles})=>(
+  <div className="p-4">
+    <div className="flex justify-between text-xs mb-2" style={{color:"var(--m)"}}>
+      <span className="flex items-center gap-2"><div className="spin"/>{message}</span>
+      <span>{percent}%{totalFiles?` — ${filesDone}/${totalFiles} files`:""}</span>
+    </div>
+    <div style={{background:"var(--b)",borderRadius:4,height:6}}>
+      <div className="bar-fill" style={{width:`${percent}%`,height:"100%",borderRadius:4,background:"var(--a)"}}/>
+    </div>
+  </div>
+);
+
+/* ── Eval panel ── */
+const EvalPanel=({ev})=>{
+  if(!ev)return<div className="flex items-center justify-center h-full" style={{color:"var(--m)"}}><p className="text-sm">Generate an app to see metrics</p></div>;
+  const {scores,grade,complexity}=ev;
+  const metrics=[
+    {l:"Syntax Correctness",k:"syntax_correctness",w:"30%"},
+    {l:"Field Consistency",k:"field_consistency",w:"25%"},
+    {l:"View Coverage",k:"view_coverage",w:"20%"},
+    {l:"Template Completeness",k:"template_completeness",w:"15%"},
+    {l:"URL Integrity",k:"url_integrity",w:"10%"},
+  ];
+  return(
+    <div className="p-4 overflow-y-auto h-full fade">
+      <div className="flex items-center gap-4 mb-4 p-4 rounded-xl" style={{background:"var(--s2)",border:"1px solid var(--b)"}}>
+        <div className="text-5xl font-bold" style={{color:gradeColor(grade)}}>{grade}</div>
+        <div>
+          <p className="text-xs" style={{color:"var(--m)"}}>Overall Quality Score</p>
+          <p className="text-3xl font-bold" style={{color:scoreColor(scores.overall_quality)}}>{scores.overall_quality}%</p>
+        </div>
+      </div>
+      {metrics.map(m=>(
+        <div key={m.k} className="mb-3">
+          <div className="flex justify-between text-xs mb-1" style={{color:"var(--m)"}}>
+            <span>{m.l} <span className="opacity-50">×{m.w}</span></span>
+            <span style={{color:scoreColor(scores[m.k]),fontWeight:600}}>{scores[m.k]}%</span>
+          </div>
+          <div style={{background:"var(--b)",borderRadius:4,height:5}}>
+            <div style={{width:`${scores[m.k]}%`,height:"100%",borderRadius:4,background:scoreColor(scores[m.k]),transition:"width .6s"}}/>
+          </div>
+        </div>
+      ))}
+      <div className="grid grid-cols-3 gap-2 mt-4">
+        {[{l:"Entities",v:complexity.entity_count},{l:"Views",v:complexity.view_count},{l:"Files",v:complexity.total_files},{l:"Lines",v:complexity.total_lines}].map(c=>(
+          <div key={c.l} className="p-3 rounded-lg text-center" style={{background:"var(--s2)",border:"1px solid var(--b)"}}>
+            <p className="text-lg font-bold">{c.v}</p>
+            <p className="text-xs" style={{color:"var(--m)"}}>{c.l}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ── SIR panel ── */
+const SIRPanel=({sir})=>{
+  if(!sir)return<div className="flex items-center justify-center h-full" style={{color:"var(--m)"}}><p className="text-sm">SIR appears after generation</p></div>;
+  return(
+    <div className="p-3 overflow-y-auto h-full fade text-xs">
+      <div className="p-3 rounded-lg mb-3" style={{background:"var(--s2)",border:"1px solid var(--b)"}}>
+        <p className="font-semibold" style={{color:"var(--a)"}}>{sir.project_name}</p>
+        <p className="mt-1" style={{color:"var(--m)"}}>{sir.description}</p>
+        <div className="flex gap-2 mt-2">
+          <span className="px-2 py-0.5 rounded" style={{background:"rgba(99,102,241,.15)",color:"var(--a)"}}>{sir.domain}</span>
+          <span className="px-2 py-0.5 rounded" style={{background:"rgba(34,197,94,.15)",color:"var(--g)"}}>complexity {sir.complexity_score}/10</span>
+        </div>
+      </div>
+      <p className="font-semibold uppercase tracking-widest mb-2" style={{color:"var(--m)"}}>Entities ({sir.entities?.length})</p>
+      {sir.entities?.map(e=>(
+        <div key={e.name} className="mb-2 p-2 rounded" style={{background:"var(--s2)",border:"1px solid var(--b)"}}>
+          <p className="font-semibold mb-1">🗄️ {e.name}</p>
+          {e.fields?.map(f=>(
+            <div key={f.name} className="flex justify-between py-0.5" style={{borderBottom:"1px solid var(--b)"}}>
+              <span>{f.name}</span><span style={{color:"var(--a)"}}>{f.type}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+      <p className="font-semibold uppercase tracking-widest mb-2 mt-3" style={{color:"var(--m)"}}>Views ({sir.views?.length})</p>
+      {sir.views?.map(v=>(
+        <div key={v.name} className="flex justify-between px-2 py-1.5 mb-1 rounded" style={{background:"var(--s2)"}}>
+          <span>👁️ {v.name}</span><span style={{color:"var(--a)"}}>{v.type}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════════
+   MAIN APP
+══════════════════════════════════════════════ */
+const App=()=>{
+  const [prompt,setPrompt]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [progress,setProgress]=useState(null);
+  const [files,setFiles]=useState({});
+  const [sir,setSir]=useState(null);
+  const [evaluation,setEvaluation]=useState(null);
+  const [preview,setPreview]=useState("");
+  const [sessionId,setSessionId]=useState(null);
+  const [selFile,setSelFile]=useState(null);
+  const [status,setStatus]=useState(null);
+  const [downloading,setDownloading]=useState(false);
+  const [leftTab,setLeftTab]=useState("files");
+  const [rightTab,setRightTab]=useState("preview");
+  const [leftW,setLeftW]=useState(260);
+  const esRef=useRef(null);
+  const drag=useRef(false);const dragX=useRef(0);const dragW=useRef(0);
+
+  /* resize */
+  const onRS=useCallback(e=>{drag.current=true;dragX.current=e.clientX;dragW.current=leftW;
+    document.body.style.cursor="col-resize";document.body.style.userSelect="none";},[leftW]);
+  useEffect(()=>{
+    const mv=e=>{if(!drag.current)return;setLeftW(Math.max(200,Math.min(500,dragW.current+(e.clientX-dragX.current))))};
+    const up=()=>{drag.current=false;document.body.style.cursor="";document.body.style.userSelect=""};
+    window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);
+    return()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up)};
+  },[]);
+
+  const examples=["A simple blog with posts and categories","A task manager with projects and tasks","A bookstore with books and authors","A todo list with tasks and priorities"];
+
+  /* ── Generate via SSE ── */
+  const generate=useCallback(()=>{
+    if(!prompt.trim()||loading)return;
+    setLoading(true);setFiles({});setSir(null);setEvaluation(null);
+    setPreview("");setSessionId(null);setSelFile(null);
+    setProgress({percent:2,message:"Connecting...",filesDone:0,totalFiles:0});
+    setStatus(null);
+
+    // Close any existing SSE
+    if(esRef.current){esRef.current.close();esRef.current=null;}
+
+    fetch(`${API}/generate`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({prompt}),
+    }).then(res=>{
+      if(!res.ok)throw new Error(`HTTP ${res.status}`);
+      const reader=res.body.getReader();
+      const decoder=new TextDecoder();
+      let buffer="";
+
+      const processChunk=({done,value})=>{
+        if(done){setLoading(false);return;}
+        buffer+=decoder.decode(value,{stream:true});
+        const parts=buffer.split("\n\n");
+        buffer=parts.pop()||"";
+
+        for(const part of parts){
+          if(!part.trim())continue;
+          const lines=part.split("\n");
+          let event="message",dataStr="";
+          for(const line of lines){
+            if(line.startsWith("event:"))event=line.slice(6).trim();
+            else if(line.startsWith("data:"))dataStr=line.slice(5).trim();
+          }
+          if(!dataStr)continue;
+          try{
+            const d=JSON.parse(dataStr);
+            if(event==="progress"){
+              setProgress({percent:d.percent,message:d.message,filesDone:d.file_index||0,totalFiles:d.total_files||0});
+            }
+            else if(event==="sir"){
+              setSir(d.sir);
+              setStatus({type:"info",text:d.message});
+            }
+            else if(event==="file"){
+              setFiles(prev=>({...prev,[d.path]:d.content}));
+              if(!selFile&&d.path.endsWith(".py"))setSelFile(d.path);
+            }
+            else if(event==="done"){
+              setSessionId(d.session_id);
+              setEvaluation(d.evaluation);
+              setPreview(d.preview_html||"");
+              setProgress(null);
+              setLoading(false);
+              setStatus({type:"ok",text:d.message});
+              setRightTab("preview");
+            }
+            else if(event==="error"){
+              setStatus({type:"err",text:"✗ "+d.message});
+              setProgress(null);setLoading(false);
+            }
+          }catch(e){console.warn("SSE parse error:",e);}
+        }
+        return reader.read().then(processChunk);
+      };
+
+      reader.read().then(processChunk);
+    }).catch(e=>{
+      setStatus({type:"err",text:"✗ "+e.message});
+      setProgress(null);setLoading(false);
+    });
+  },[prompt,loading]);
+
+  /* ── Download ── */
+  const download=useCallback(async()=>{
+    if(!sessionId||downloading)return;
+    setDownloading(true);
+    try{
+      const r=await fetch(`${API}/download/${sessionId}`);
+      if(!r.ok)throw new Error("Download failed");
+      const blob=await r.blob();
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url;a.download=`${sir?.project_name||"project"}.zip`;a.click();
+      URL.revokeObjectURL(url);
+      setStatus({type:"ok",text:"✓ Download started"});
+    }catch(e){setStatus({type:"err",text:"✗ "+e.message});}
+    setDownloading(false);
+  },[sessionId,downloading,sir]);
+
+  const previewSrc=useMemo(()=>{
+    if(!preview)return"";
+    // إرجاع المعاينة الجاهزة المدمجة والمغذّاة بالبيانات مباشرة من السيرفر
+    return preview;
+  },[preview]);
+
+  const tree=useMemo(()=>buildTree(files),[files]);
+  const fileCount=Object.keys(files).length;
+
+  const LEFT_TABS=[{id:"files",label:"📁 Files"},{id:"sir",label:"🧩 SIR"}];
+  const RIGHT_TABS=[{id:"preview",label:"🖥 Preview"},{id:"code",label:"📄 Code"},{id:"eval",label:"📊 Eval"}];
+
+  return(
+    <div className="flex flex-col h-screen overflow-hidden">
+
+      {/* Header */}
+      <header className="flex items-center justify-between px-5 py-2.5 flex-shrink-0" style={{background:"var(--s)",borderBottom:"1px solid var(--b)"}}>
+        <div className="flex items-center gap-3">
+          <span className="text-xl">⚡</span>
+          <div>
+            <h1 className="font-bold text-base" style={{color:"var(--a)"}}>DjangoForge</h1>
+            <p className="text-xs" style={{color:"var(--m)"}}>NL → SIR → Django App · v3.0</p>
+          </div>
+        </div>
+        {sessionId&&(
+          <button onClick={download} disabled={downloading}
+            className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-semibold"
+            style={{background:downloading?"var(--b)":"var(--g)",color:"#fff",cursor:downloading?"not-allowed":"pointer"}}>
+            {downloading?<><div className="spin" style={{borderColor:"rgba(255,255,255,.3)",borderTopColor:"#fff"}}/>Packing…</>:<>⬇ Download .zip</>}
+          </button>
+        )}
+      </header>
+
+      {/* Prompt */}
+      <div className="px-5 py-3 flex-shrink-0" style={{background:"var(--s)",borderBottom:"1px solid var(--b)"}}>
+        <div className="flex gap-2 mb-2">
+          <textarea value={prompt} onChange={e=>setPrompt(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey))generate()}}
+            rows={2} placeholder="Describe your Django app in natural language…"
+            className="flex-1 p-3 text-sm rounded-lg resize-none outline-none"
+            style={{background:"var(--bg)",border:"1px solid var(--b)",color:"var(--t)",fontFamily:"inherit"}}/>
+          <button onClick={generate} disabled={loading||!prompt.trim()}
+            className="px-5 rounded-lg font-semibold text-sm text-white flex flex-col items-center justify-center gap-1 min-w-[100px]"
+            style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)",opacity:loading||!prompt.trim()?0.6:1,cursor:loading||!prompt.trim()?"not-allowed":"pointer"}}>
+            {loading?<><div className="spin" style={{borderColor:"rgba(255,255,255,.3)",borderTopColor:"#fff"}}/>Generating</>:<><span className="text-lg">✦</span>Generate</>}
+          </button>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {examples.map((ex,i)=>(
+            <button key={i} onClick={()=>setPrompt(ex)}
+              className="text-xs px-2 py-1 rounded-md"
+              style={{background:"rgba(99,102,241,.1)",color:"var(--a)",border:"1px solid rgba(99,102,241,.2)"}}>
+              {ex}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Progress bar (visible during generation) */}
+      {progress&&(
+        <div className="flex-shrink-0" style={{background:"var(--s)",borderBottom:"1px solid var(--b)"}}>
+          <ProgressBar {...progress}/>
+        </div>
+      )}
+
+      {/* Workspace */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* LEFT */}
+        <div className="flex flex-col flex-shrink-0 overflow-hidden" style={{width:leftW,background:"var(--s)",borderRight:"1px solid var(--b)"}}>
+          <div className="flex flex-shrink-0" style={{borderBottom:"1px solid var(--b)"}}>
+            {LEFT_TABS.map(t=>(
+              <button key={t.id} onClick={()=>setLeftTab(t.id)}
+                className={`tab flex-1 py-2 text-xs font-medium ${leftTab===t.id?"on":""}`}
+                style={{color:leftTab===t.id?"var(--a)":"var(--m)"}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 overflow-hidden">
+            {leftTab==="files"?(
+              fileCount>0?(
+                <div className="overflow-y-auto h-full py-1 fade">
+                  {sir&&(
+                    <div className="mx-2 mb-2 px-3 py-2 rounded-lg text-xs" style={{background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.2)"}}>
+                      <p className="font-semibold" style={{color:"var(--a)"}}>{sir.project_name}</p>
+                      <p style={{color:"var(--m)"}}>{fileCount} files generated</p>
+                    </div>
+                  )}
+                  {Object.entries(tree).map(([n,nd])=>(
+                    <TNode key={n} name={n} node={nd} depth={0}
+                      onSel={p=>{setSelFile(p);setRightTab("code")}} sel={selFile}/>
+                  ))}
+                </div>
+              ):(
+                <div className="flex flex-col items-center justify-center h-full gap-2" style={{color:"var(--m)"}}>
+                  {loading?<div className="spin" style={{width:24,height:24,borderWidth:3}}/>:<span className="text-3xl opacity-20">📂</span>}
+                  <p className="text-xs">{loading?"Generating files…":"No files yet"}</p>
+                </div>
+              )
+            ):(
+              <SIRPanel sir={sir}/>
+            )}
+          </div>
+        </div>
+
+        {/* Resize */}
+        <div className="rh" onMouseDown={onRS}/>
+
+        {/* RIGHT */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex flex-shrink-0" style={{borderBottom:"1px solid var(--b)",background:"var(--s)"}}>
+            {RIGHT_TABS.map(t=>(
+              <button key={t.id} onClick={()=>setRightTab(t.id)}
+                className={`tab px-5 py-2.5 text-xs font-medium ${rightTab===t.id?"on":""}`}
+                style={{color:rightTab===t.id?"var(--a)":"var(--m)"}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 overflow-hidden">
+            {rightTab==="preview"&&(
+              preview?(
+                <iframe srcDoc={previewSrc} className="w-full h-full border-none" sandbox="allow-scripts allow-same-origin" title="Preview"/>
+              ):(
+                <div className="flex flex-col items-center justify-center h-full gap-3" style={{color:"var(--m)"}}>
+                  <span className="text-5xl opacity-20">🏗</span>
+                  <p className="text-sm">{loading?"Generating preview…":"Generate an app to see the live preview"}</p>
+                </div>
+              )
+            )}
+            {rightTab==="code"&&(
+              selFile&&files[selFile]!==undefined?<CodeView path={selFile} content={files[selFile]}/>:(
+                <div className="flex items-center justify-center h-full" style={{color:"var(--m)"}}>
+                  <p className="text-sm">← Select a file from the tree</p>
+                </div>
+              )
+            )}
+            {rightTab==="eval"&&<EvalPanel ev={evaluation}/>}
+          </div>
+        </div>
+      </div>
+
+      {/* Status bar */}
+      {status&&!progress&&(
+        <div className="px-5 py-1.5 text-xs flex-shrink-0" style={{
+          background:"var(--s)",borderTop:"1px solid var(--b)",
+          color:status.type==="err"?"var(--r)":status.type==="ok"?"var(--g)":"var(--m)"
+        }}>
+          {status.text}
+        </div>
+      )}
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</head>
+<body><div id="root"></div></body>
+</html>

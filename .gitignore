@@ -1,0 +1,20 @@
+# Environment variables & Keys
+*.env
+.env
+
+# Local Research Data & Databases
+backend/experiments_data.json
+backend/experiments.db
+*.db
+*.json_data
+
+# Python Virtual Environment & Cache
+backend/venv/
+backend/__pycache__/
+backend/.pytest_cache/
+__pycache__/
+.pytest_cache/
+
+# Compressed / Temporary Files
+*.zip
+files (2).zip
