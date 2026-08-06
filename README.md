@@ -47,37 +47,56 @@ By incorporating a **Structured Intermediate Representation (SIR)** engine along
 ┌───────────────────────────┐
 │ Live Preview & ZIP Output │
 └───────────────────────────┘
+```
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.10+
 - Anthropic API Key
 
-### Installation & Local Setup
+### Installation
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/your-username/DjangoForge.git](https://github.com/your-username/DjangoForge.git)
-   cd DjangoForge 
-   
-  1. Set up virtual environment:
+   git clone https://github.com/your-username/DjangoForge.git
+   cd DjangoForge
+   ```
 
-  python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+2. **Set up virtual environment:**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-2. Install dependencies:
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-pip install -r requirements.txt
+4. **Environment Configuration:**
+   Create a `.env` file in the root directory:
+   ```env
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here
+   ```
 
-3. Environment Configuration:
-Create a .env file in the root directory:
+5. **Run the Server:**
+   ```bash
+   uvicorn main:app --reload --port 8000
+   ```
 
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
+Open your browser at `http://localhost:8000` to start building applications.
 
-4. Run the Application:
+---
 
-uvicorn main:app --reload --port 8000
+## 📊 Evaluation Score Benchmark (OQS)
 
-open your browser and navigate to http://localhost:8000 to access the interactive DjangoForge generation interface.
+DjangoForge rates projects using an **Overall Quality Score (OQS)** formula:
 
-📊 Evaluation Score Benchmark (OQS)DjangoForge rates projects using an Overall Quality Score (OQS) formula:$$\text{OQS} = 0.30 S_{syntax} + 0.25 S_{field} + 0.20 S_{view} + 0.15 S_{template} + 0.10 S_{url}$$Projects scoring ≥ 90% receive an A Grade, representing zero syntax errors and full functional coverage ready for deployment.
+$$\text{OQS} = 0.30 S_{syntax} + 0.25 S_{field} + 0.20 S_{view} + 0.15 S_{template} + 0.10 S_{url}$$
+
+Projects scoring **≥ 90%** receive an **A Grade**, representing zero syntax errors and full functional coverage ready for deployment.
+
+---
