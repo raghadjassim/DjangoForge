@@ -7,7 +7,8 @@ from datetime import datetime
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -430,9 +431,18 @@ async def stream_generation(prompt: str, sid: str):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
-@app.get("/")
-async def root():
-    return {"message": "DjangoForge API", "version": "7.2.0"}
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
+
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+@app.get("/", response_class=FileResponse)
+async def serve_index():
+    index_file = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"error": f"index.html not found at {index_file}"}
 
 @app.get("/health")
 async def health():
