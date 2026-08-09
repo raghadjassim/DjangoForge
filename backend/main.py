@@ -7,7 +7,8 @@ from datetime import datetime
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -431,26 +432,18 @@ async def stream_generation(prompt: str, sid: str):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ # الفرونت إند مجاور للباك إند في الجذر
+FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
+
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 @app.get("/")
 async def serve_index():
-    # احتمالات مسار ملف index.html حسب بيئة التشغيل في Railway
-    possible_paths = [
-        os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "index.html")),
-        os.path.abspath(os.path.join(BASE_DIR, "frontend", "index.html")),
-        os.path.join(os.getcwd(), "frontend", "index.html"),
-        os.path.join(os.getcwd(), "..", "frontend", "index.html"),
-    ]
-
-    for path in possible_paths:
-        if os.path.exists(path):
-            return FileResponse(path)
-
-    # إذا لم يجد الملف، يرجع HTMLResponse عادي مع تجنب تمرير dict لـ FileResponse
-    return HTMLResponse(
-        content=f"<h2>DjangoForge API Status: Active 🚀</h2><p>Frontend file index.html not found in build directory.</p>",
-        status_code=200
-    )
+    index_path = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"error": "Frontend missing"}
 
 @app.get("/health")
 async def health():
