@@ -431,14 +431,23 @@ async def stream_generation(prompt: str, sid: str):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INDEX_PATH = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "index.html"))
 
 @app.get("/")
 async def serve_index():
-    if os.path.exists(INDEX_PATH):
-        return FileResponse(INDEX_PATH)
+    # البحث عن index.html بجميع المسارات الممكنة داخل البيئة
+    possible_paths = [
+        os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "index.html")),
+        os.path.abspath(os.path.join(os.getcwd(), "..", "frontend", "index.html")),
+        os.path.abspath(os.path.join(BASE_DIR, "frontend", "index.html")),
+        "/app/frontend/index.html",
+    ]
+
+    for path in possible_paths:
+        if os.path.exists(path):
+            return FileResponse(path)
+
     return HTMLResponse(
-        content=f"<h3>index.html Not Found</h3><p>Checked path: {INDEX_PATH}</p>",
+        content=f"<h3>index.html Not Found</h3><p>Checked paths: {possible_paths}</p>",
         status_code=404
     )
 
