@@ -7,8 +7,7 @@ from datetime import datetime
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, JSONResponse
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -432,18 +431,16 @@ async def stream_generation(prompt: str, sid: str):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
- # الفرونت إند مجاور للباك إند في الجذر
-FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend"))
-
-if os.path.exists(FRONTEND_DIR):
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+INDEX_PATH = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "index.html"))
 
 @app.get("/")
 async def serve_index():
-    index_path = os.path.join(FRONTEND_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {"error": "Frontend missing"}
+    if os.path.exists(INDEX_PATH):
+        return FileResponse(INDEX_PATH)
+    return HTMLResponse(
+        content=f"<h3>index.html Not Found</h3><p>Checked path: {INDEX_PATH}</p>",
+        status_code=404
+    )
 
 @app.get("/health")
 async def health():
