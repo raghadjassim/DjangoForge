@@ -29,8 +29,7 @@ pre code.hljs{background:transparent!important;font-size:11.5px;line-height:1.6}
 const {useState,useEffect,useRef,useCallback,useMemo}=React;
 
 /* ── Config ── */
-const API = window.location.hostname === "localhost" ? "http://localhost:8000" : "https://YOUR-RAILWAY-URL.railway.app";
-
+const API = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "http://localhost:8000" : "";
 /* ── Helpers ── */
 const ext2lang=p=>p.endsWith(".py")?"python":p.endsWith(".html")?"html":p.endsWith(".md")?"markdown":"text";
 const fileIcon=p=>{
