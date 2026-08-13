@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>DjangoForge</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -23,13 +23,49 @@ pre code.hljs{background:transparent!important;font-size:11.5px;line-height:1.6}
 .tab{border-bottom:2px solid transparent;transition:all .15s}.tab.on{border-bottom-color:var(--a);color:var(--a)}
 .rh{width:4px;background:var(--b);cursor:col-resize;flex-shrink:0}.rh:hover{background:var(--a)}
 .bar-fill{transition:width .5s ease}
-.file-pulse{animation:pulse 1s ease infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ── Mobile & Responsive Tweaks ── */
+@media (max-width: 768px) {
+  body {
+    height: 100dvh !important;
+    overflow-y: auto !important;
+  }
+  .app-header {
+    padding: 8px 12px !important;
+  }
+  .workspace-layout {
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    height: auto !important;
+  }
+  .left-panel {
+    width: 100% !important;
+    max-height: 300px;
+    border-right: none !important;
+    border-bottom: 1px solid var(--b) !important;
+  }
+  .rh {
+    display: none !important;
+  }
+  .prompt-box {
+    flex-direction: column !important;
+  }
+  .btn-generate {
+    width: 100% !important;
+    min-height: 44px !important;
+  }
+  .right-panel {
+    min-height: 450px;
+    height: 60vh;
+  }
+}
 </style>
 <script type="text/babel">
 const {useState,useEffect,useRef,useCallback,useMemo}=React;
 
-/* ── Config ── */
+/* ── Dynamic API Config (Localhost + Production/Railway) ── */
 const API = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "http://localhost:8000" : "";
+
 /* ── Helpers ── */
 const ext2lang=p=>p.endsWith(".py")?"python":p.endsWith(".html")?"html":p.endsWith(".md")?"markdown":"text";
 const fileIcon=p=>{
@@ -79,7 +115,7 @@ const TNode=({name,node,depth,onSel,sel})=>{
   if(node.__f){
     const active=sel===node.__p;
     return(
-      <div onClick={()=>onSel(node.__p)} className={`tree-row flex items-center gap-1.5 py-1 cursor-pointer text-xs rounded px-1 ${active?"on":""}`} style={{paddingLeft:(depth+1)*12}}>
+      <div onClick={()=>onSel(node.__p)} className={`tree-row flex items-center gap-1.5 py-1.5 cursor-pointer text-xs rounded px-1 ${active?"on":""}`} style={{paddingLeft:(depth+1)*12}}>
         <span>{fileIcon(name)}</span>
         <span style={{color:active?"var(--a)":"var(--t)"}}>{name}</span>
       </div>
@@ -88,7 +124,7 @@ const TNode=({name,node,depth,onSel,sel})=>{
   const children=Object.entries(node).filter(([k])=>!k.startsWith("__"));
   return(
     <div>
-      <div onClick={()=>setOpen(o=>!o)} className="flex items-center gap-1.5 py-1 cursor-pointer text-xs" style={{paddingLeft:depth*12,color:"var(--m)"}}>
+      <div onClick={()=>setOpen(o=>!o)} className="flex items-center gap-1.5 py-1.5 cursor-pointer text-xs" style={{paddingLeft:depth*12,color:"var(--m)"}}>
         <span style={{fontSize:9}}>{open?"▼":"▶"}</span><span>📂</span><span className="font-medium">{name}/</span>
       </div>
       {open&&children.map(([n,nd])=><TNode key={n} name={n} node={nd} depth={depth+1} onSel={onSel} sel={sel}/>)}
@@ -123,10 +159,10 @@ const EvalPanel=({ev})=>{
   return(
     <div className="p-4 overflow-y-auto h-full fade">
       <div className="flex items-center gap-4 mb-4 p-4 rounded-xl" style={{background:"var(--s2)",border:"1px solid var(--b)"}}>
-        <div className="text-5xl font-bold" style={{color:gradeColor(grade)}}>{grade}</div>
+        <div className="text-4xl md:text-5xl font-bold" style={{color:gradeColor(grade)}}>{grade}</div>
         <div>
           <p className="text-xs" style={{color:"var(--m)"}}>Overall Quality Score</p>
-          <p className="text-3xl font-bold" style={{color:scoreColor(scores.overall_quality)}}>{scores.overall_quality}%</p>
+          <p className="text-2xl md:text-3xl font-bold" style={{color:scoreColor(scores.overall_quality)}}>{scores.overall_quality}%</p>
         </div>
       </div>
       {metrics.map(m=>(
@@ -140,7 +176,7 @@ const EvalPanel=({ev})=>{
           </div>
         </div>
       ))}
-      <div className="grid grid-cols-3 gap-2 mt-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
         {[{l:"Entities",v:complexity.entity_count},{l:"Views",v:complexity.view_count},{l:"Files",v:complexity.total_files},{l:"Lines",v:complexity.total_lines}].map(c=>(
           <div key={c.l} className="p-3 rounded-lg text-center" style={{background:"var(--s2)",border:"1px solid var(--b)"}}>
             <p className="text-lg font-bold">{c.v}</p>
@@ -219,7 +255,7 @@ const App=()=>{
 
   const examples=["A simple blog with posts and categories","A task manager with projects and tasks","A bookstore with books and authors","A todo list with tasks and priorities"];
 
-  /* ── Generate via SSE ── */
+  /* ── Generate via Stream ── */
   const generate=useCallback(()=>{
     if(!prompt.trim()||loading)return;
     setLoading(true);setFiles({});setSir(null);setEvaluation(null);
@@ -227,7 +263,6 @@ const App=()=>{
     setProgress({percent:2,message:"Connecting...",filesDone:0,totalFiles:0});
     setStatus(null);
 
-    // Close any existing SSE
     if(esRef.current){esRef.current.close();esRef.current=null;}
 
     fetch(`${API}/generate`,{
@@ -310,12 +345,6 @@ const App=()=>{
     setDownloading(false);
   },[sessionId,downloading,sir]);
 
-  const previewSrc=useMemo(()=>{
-    if(!preview)return"";
-    // إرجاع المعاينة الجاهزة المدمجة والمغذّاة بالبيانات مباشرة من السيرفر
-    return preview;
-  },[preview]);
-
   const tree=useMemo(()=>buildTree(files),[files]);
   const fileCount=Object.keys(files).length;
 
@@ -326,41 +355,41 @@ const App=()=>{
     <div className="flex flex-col h-screen overflow-hidden">
 
       {/* Header */}
-      <header className="flex items-center justify-between px-5 py-2.5 flex-shrink-0" style={{background:"var(--s)",borderBottom:"1px solid var(--b)"}}>
+      <header className="app-header flex items-center justify-between px-5 py-2.5 flex-shrink-0" style={{background:"var(--s)",borderBottom:"1px solid var(--b)"}}>
         <div className="flex items-center gap-3">
           <span className="text-xl">⚡</span>
           <div>
-            <h1 className="font-bold text-base" style={{color:"var(--a)"}}>DjangoForge</h1>
-            <p className="text-xs" style={{color:"var(--m)"}}>NL → SIR → Django App · v3.0</p>
+            <h1 className="font-bold text-sm md:text-base" style={{color:"var(--a)"}}>DjangoForge</h1>
+            <p className="text-[10px] md:text-xs" style={{color:"var(--m)"}}>NL → SIR → Django App · v3.0</p>
           </div>
         </div>
         {sessionId&&(
           <button onClick={download} disabled={downloading}
-            className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-semibold"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold"
             style={{background:downloading?"var(--b)":"var(--g)",color:"#fff",cursor:downloading?"not-allowed":"pointer"}}>
-            {downloading?<><div className="spin" style={{borderColor:"rgba(255,255,255,.3)",borderTopColor:"#fff"}}/>Packing…</>:<>⬇ Download .zip</>}
+            {downloading?<><div className="spin" style={{borderColor:"rgba(255,255,255,.3)",borderTopColor:"#fff"}}/>Packing…</>:<>⬇ Zip</>}
           </button>
         )}
       </header>
 
-      {/* Prompt */}
-      <div className="px-5 py-3 flex-shrink-0" style={{background:"var(--s)",borderBottom:"1px solid var(--b)"}}>
-        <div className="flex gap-2 mb-2">
+      {/* Prompt Area */}
+      <div className="px-3 md:px-5 py-2 md:py-3 flex-shrink-0" style={{background:"var(--s)",borderBottom:"1px solid var(--b)"}}>
+        <div className="prompt-box flex gap-2 mb-2">
           <textarea value={prompt} onChange={e=>setPrompt(e.target.value)}
             onKeyDown={e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey))generate()}}
             rows={2} placeholder="Describe your Django app in natural language…"
-            className="flex-1 p-3 text-sm rounded-lg resize-none outline-none"
+            className="flex-1 p-2.5 text-xs md:text-sm rounded-lg resize-none outline-none"
             style={{background:"var(--bg)",border:"1px solid var(--b)",color:"var(--t)",fontFamily:"inherit"}}/>
           <button onClick={generate} disabled={loading||!prompt.trim()}
-            className="px-5 rounded-lg font-semibold text-sm text-white flex flex-col items-center justify-center gap-1 min-w-[100px]"
+            className="btn-generate px-4 md:px-5 py-2 rounded-lg font-semibold text-xs md:text-sm text-white flex flex-row md:flex-col items-center justify-center gap-1 min-w-[90px]"
             style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)",opacity:loading||!prompt.trim()?0.6:1,cursor:loading||!prompt.trim()?"not-allowed":"pointer"}}>
-            {loading?<><div className="spin" style={{borderColor:"rgba(255,255,255,.3)",borderTopColor:"#fff"}}/>Generating</>:<><span className="text-lg">✦</span>Generate</>}
+            {loading?<><div className="spin" style={{borderColor:"rgba(255,255,255,.3)",borderTopColor:"#fff"}}/>Generating</>:<><span className="text-base md:text-lg">✦</span>Generate</>}
           </button>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
           {examples.map((ex,i)=>(
             <button key={i} onClick={()=>setPrompt(ex)}
-              className="text-xs px-2 py-1 rounded-md"
+              className="text-[10px] md:text-xs px-2 py-1 rounded-md whitespace-nowrap flex-shrink-0"
               style={{background:"rgba(99,102,241,.1)",color:"var(--a)",border:"1px solid rgba(99,102,241,.2)"}}>
               {ex}
             </button>
@@ -368,18 +397,18 @@ const App=()=>{
         </div>
       </div>
 
-      {/* Progress bar (visible during generation) */}
+      {/* Progress */}
       {progress&&(
         <div className="flex-shrink-0" style={{background:"var(--s)",borderBottom:"1px solid var(--b)"}}>
           <ProgressBar {...progress}/>
         </div>
       )}
 
-      {/* Workspace */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* Workspace Area */}
+      <div className="workspace-layout flex flex-1 overflow-hidden">
 
-        {/* LEFT */}
-        <div className="flex flex-col flex-shrink-0 overflow-hidden" style={{width:leftW,background:"var(--s)",borderRight:"1px solid var(--b)"}}>
+        {/* LEFT PANEL */}
+        <div className="left-panel flex flex-col flex-shrink-0 overflow-hidden" style={{width:leftW,background:"var(--s)",borderRight:"1px solid var(--b)"}}>
           <div className="flex flex-shrink-0" style={{borderBottom:"1px solid var(--b)"}}>
             {LEFT_TABS.map(t=>(
               <button key={t.id} onClick={()=>setLeftTab(t.id)}
@@ -394,7 +423,7 @@ const App=()=>{
               fileCount>0?(
                 <div className="overflow-y-auto h-full py-1 fade">
                   {sir&&(
-                    <div className="mx-2 mb-2 px-3 py-2 rounded-lg text-xs" style={{background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.2)"}}>
+                    <div className="mx-2 mb-2 px-3 py-1.5 rounded-lg text-xs" style={{background:"rgba(99,102,241,.08)",border:"1px solid rgba(99,102,241,.2)"}}>
                       <p className="font-semibold" style={{color:"var(--a)"}}>{sir.project_name}</p>
                       <p style={{color:"var(--m)"}}>{fileCount} files generated</p>
                     </div>
@@ -405,7 +434,7 @@ const App=()=>{
                   ))}
                 </div>
               ):(
-                <div className="flex flex-col items-center justify-center h-full gap-2" style={{color:"var(--m)"}}>
+                <div className="flex flex-col items-center justify-center h-full gap-2 p-4" style={{color:"var(--m)"}}>
                   {loading?<div className="spin" style={{width:24,height:24,borderWidth:3}}/>:<span className="text-3xl opacity-20">📂</span>}
                   <p className="text-xs">{loading?"Generating files…":"No files yet"}</p>
                 </div>
@@ -416,15 +445,15 @@ const App=()=>{
           </div>
         </div>
 
-        {/* Resize */}
+        {/* Resizer Handle */}
         <div className="rh" onMouseDown={onRS}/>
 
-        {/* RIGHT */}
-        <div className="flex flex-col flex-1 overflow-hidden">
+        {/* RIGHT PANEL */}
+        <div className="right-panel flex flex-col flex-1 overflow-hidden">
           <div className="flex flex-shrink-0" style={{borderBottom:"1px solid var(--b)",background:"var(--s)"}}>
             {RIGHT_TABS.map(t=>(
               <button key={t.id} onClick={()=>setRightTab(t.id)}
-                className={`tab px-5 py-2.5 text-xs font-medium ${rightTab===t.id?"on":""}`}
+                className={`tab px-4 md:px-5 py-2.5 text-xs font-medium ${rightTab===t.id?"on":""}`}
                 style={{color:rightTab===t.id?"var(--a)":"var(--m)"}}>
                 {t.label}
               </button>
@@ -433,18 +462,18 @@ const App=()=>{
           <div className="flex-1 overflow-hidden">
             {rightTab==="preview"&&(
               preview?(
-                <iframe srcDoc={previewSrc} className="w-full h-full border-none" sandbox="allow-scripts allow-same-origin" title="Preview"/>
+                <iframe srcDoc={preview} className="w-full h-full border-none" sandbox="allow-scripts allow-same-origin" title="Preview"/>
               ):(
-                <div className="flex flex-col items-center justify-center h-full gap-3" style={{color:"var(--m)"}}>
-                  <span className="text-5xl opacity-20">🏗</span>
-                  <p className="text-sm">{loading?"Generating preview…":"Generate an app to see the live preview"}</p>
+                <div className="flex flex-col items-center justify-center h-full gap-3 p-4" style={{color:"var(--m)"}}>
+                  <span className="text-4xl md:text-5xl opacity-20">🏗</span>
+                  <p className="text-xs md:text-sm text-center">{loading?"Generating preview…":"Generate an app to see the live preview"}</p>
                 </div>
               )
             )}
             {rightTab==="code"&&(
               selFile&&files[selFile]!==undefined?<CodeView path={selFile} content={files[selFile]}/>:(
-                <div className="flex items-center justify-center h-full" style={{color:"var(--m)"}}>
-                  <p className="text-sm">← Select a file from the tree</p>
+                <div className="flex items-center justify-center h-full p-4" style={{color:"var(--m)"}}>
+                  <p className="text-xs md:text-sm text-center">← Select a file from the tree</p>
                 </div>
               )
             )}
@@ -453,9 +482,9 @@ const App=()=>{
         </div>
       </div>
 
-      {/* Status bar */}
+      {/* Status Bar */}
       {status&&!progress&&(
-        <div className="px-5 py-1.5 text-xs flex-shrink-0" style={{
+        <div className="px-4 py-1.5 text-xs flex-shrink-0" style={{
           background:"var(--s)",borderTop:"1px solid var(--b)",
           color:status.type==="err"?"var(--r)":status.type==="ok"?"var(--g)":"var(--m)"
         }}>
